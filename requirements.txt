@@ -1,0 +1,9 @@
+requests
+beautifulsoup4
+pdfplumber
+google-genai
+pandas
+python-telegram-bot
+schedule
+yfinance
+python-dotenv
