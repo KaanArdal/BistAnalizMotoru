@@ -1,5 +1,7 @@
 # BIST Halka Arz & Analiz Motoru 🚀 (Telegram Bot Edition)
 
+![Status](https://img.shields.io/badge/Status-Aktif-success) ![Platform](https://img.shields.io/badge/Platform-Telegram-blue) ![AI](https://img.shields.io/badge/AI-Gemini-orange)
+
 Borsa İstanbul'daki halka arzları (IPO) ve yeni işlem görmeye başlayan hisseleri tamamen otonom bir şekilde analiz eden, "akıllı parayı" takip eden ve Telegram üzerinden etkileşimli çalışan bir Yatırım Asistanı.
 
 ## 🌟 Neler Yapabiliyor?
