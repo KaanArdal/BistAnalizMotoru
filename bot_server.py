@@ -35,7 +35,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/son - En son eklenen halka arzı otomatik bulup analiz eder.\n"
         "/analiz <KOD> - İstediğiniz bir halka arzın detaylı yapay zeka analizini yapar (Örn: `/analiz KOTON`).\n"
         "/hepsi - Yakın zamanda onaylanan halka arzların listesini getirir.\n"
-        "/radar - Portföydeki hisseler için anlık 'Balina Çıkışı' (el değiştirme oranı) taraması yapar.\n\n"
+        "/radar - Portföydeki hisseler için anlık 'Balina Çıkışı' (el değiştirme oranı) taraması yapar.\n"
+        "/id - Bu sohbetin (grup veya özel) Telegram Chat ID'sini gösterir.\n\n"
         "💼 **PORTFÖY KOMUTLARI**\n"
         "Yatırımlarınızı takip etmek için komutları kullanabilirsiniz:\n\n"
         "👉 **Hisse Ekleme (Alım):**\n"
@@ -127,6 +128,17 @@ async def kisiler_portfoy(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     await update.message.reply_text(mesaj, parse_mode="Markdown")
 
+async def chat_id_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat = update.effective_chat
+    user = update.effective_user
+    mesaj = (
+        f"ℹ️ **Sohbet Bilgileri**\n\n"
+        f"📌 **Chat ID:** `{chat.id}`\n"
+        f"👥 **Tür:** {chat.type}\n"
+        f"🏷️ **Başlık/İsim:** {chat.title or user.first_name}"
+    )
+    await update.message.reply_text(mesaj, parse_mode="Markdown")
+
 async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     if not text.startswith('/'):
@@ -136,9 +148,10 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
     if not parts:
         return
         
-    komut = parts[0].lower()
+    # @botname takısını temizle (gruplarda /komut@botname şeklinde gelebilir)
+    komut = parts[0].lower().split('@')[0]
     
-    if komut in ['start', 'son', 'analiz', 'hepsi', 'radar', 'kisiler', 'help']:
+    if komut in ['start', 'son', 'analiz', 'hepsi', 'radar', 'kisiler', 'help', 'id']:
         return
         
     if len(parts) >= 4 and parts[3].lower() in ['al', 'sat']:
@@ -227,6 +240,15 @@ async def radar_kontrol(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     await update.message.reply_text(mesaj, parse_mode="Markdown")
 
+async def send_alert_to_all(context: ContextTypes.DEFAULT_TYPE, text: str):
+    """Tanımlı tüm sohbetlere (kişisel + grup) bildirim gönderir."""
+    chat_ids = config.get_chat_ids()
+    for cid in chat_ids:
+        try:
+            await context.bot.send_message(chat_id=cid, text=text, parse_mode="Markdown")
+        except Exception as e:
+            print(f"Bildirim gönderme hatası (Chat ID: {cid}): {e}")
+
 async def radar_job(context: ContextTypes.DEFAULT_TYPE):
     """Arka planda sürekli radarı kontrol eden JobQueue görevi."""
     try:
@@ -239,7 +261,7 @@ async def radar_job(context: ContextTypes.DEFAULT_TYPE):
                 sonuc = radar.check_turnover(hisse["kodu"], hisse["lot"])
                 if sonuc and sonuc['uyari']:
                     mesaj = f"🚨 **OTOMATİK RADAR UYARISI** 🚨\n\n**{sonuc['hisse_kodu']}** hissesinde günlük el değiştirme oranı %{sonuc['el_degistirme_orani']} seviyesine ulaştı!\n\nKurumsal yatırımcı veya balina çıkışı başlamış olabilir. Tavanın bozulma riski çok yüksek, çıkış (satış) stratejinizi gözden geçirin!"
-                    await context.bot.send_message(chat_id=config.TELEGRAM_CHAT_ID, text=mesaj, parse_mode="Markdown")
+                    await send_alert_to_all(context, mesaj)
     except Exception as e:
         print(f"Arka plan radar hatası: {e}")
 
@@ -269,7 +291,7 @@ async def new_ipo_alert_job(context: ContextTypes.DEFAULT_TYPE):
             if son_bilinen != "":
                 isim = liste[0]["isim"]
                 mesaj = f"🔥 **YENİ HALKA ARZ TESPİT EDİLDİ!** 🔥\n\n📌 **Şirket:** {isim}\n🔖 **Kod:** {en_yeni_kod}\n\nDetaylı analizini anında görmek için hemen şu komutu yazabilirsiniz:\n👉 `/analiz {en_yeni_kod}`"
-                await context.bot.send_message(chat_id=config.TELEGRAM_CHAT_ID, text=mesaj, parse_mode="Markdown")
+                await send_alert_to_all(context, mesaj)
                 
     except Exception as e:
         print(f"Yeni halka arz kontrol hatası: {e}")
@@ -283,6 +305,7 @@ def main():
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("id", chat_id_command))
     application.add_handler(CommandHandler("son", son_halka_arz))
     application.add_handler(CommandHandler("analiz", analiz_et))
     application.add_handler(CommandHandler("hepsi", hepsi))

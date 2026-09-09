@@ -14,7 +14,12 @@ class IzahnameAnalyzer:
         else:
             self.client = None
             
-        self.model_name = 'gemini-3.6-flash'
+        self.candidate_models = [
+            'gemini-3.7-flash',
+            'gemini-3.5-flash',
+            'gemini-3.1-flash-lite',
+            'gemini-3.6-flash'
+        ]
 
     def extract_text_from_pdf(self, pdf_path):
         """
@@ -57,15 +62,21 @@ class IzahnameAnalyzer:
         {text[:15000]}
         """
         
-        try:
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt,
-            )
-            return response.text
-        except Exception as e:
-            print(f"Gemini API hatası: {e}")
-            return f"Analiz yapılamadı: {e}"
+        last_error = None
+        for model in self.candidate_models:
+            try:
+                response = self.client.models.generate_content(
+                    model=model,
+                    contents=prompt,
+                )
+                if response and response.text:
+                    return response.text
+            except Exception as e:
+                print(f"Model '{model}' ile analiz başarısız ({e}). Diğer modele geçiliyor...")
+                last_error = e
+                continue
+                
+        return f"Analiz yapılamadı: {last_error}"
 
 if __name__ == "__main__":
     # Test
