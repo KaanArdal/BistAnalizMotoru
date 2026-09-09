@@ -111,6 +111,7 @@ async def kisiler_portfoy(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for kod, info in hisseler.items():
             lot = info['lot']
             maliyet = info['maliyet']
+            maliyet_deger = maliyet * lot
             
             if kod not in fiyat_cache:
                 fiyat_cache[kod] = portfolio.get_current_price(kod)
@@ -118,11 +119,14 @@ async def kisiler_portfoy(update: Update, context: ContextTypes.DEFAULT_TYPE):
             current_price = fiyat_cache[kod]
             if current_price:
                 guncel_deger = current_price * lot
-                maliyet_deger = maliyet * lot
+                kar_zarar = guncel_deger - maliyet_deger
+                yuzde = ((guncel_deger - maliyet_deger) / maliyet_deger * 100) if maliyet_deger > 0 else 0
+                emoji = "🟢" if kar_zarar >= 0 else "🔴"
                 user_toplam += guncel_deger
-                mesaj += f"  - {kod}: {lot} Lot ({maliyet_deger:.2f} TL -> {guncel_deger:.2f} TL)\n"
+                mesaj += f"  - {kod}: {lot} Lot ({maliyet_deger:.2f} TL ➡️ {guncel_deger:.2f} TL | {emoji} %{yuzde:+.1f})\n"
             else:
-                mesaj += f"  - {kod}: {lot} Lot (Fiyat Yok)\n"
+                user_toplam += maliyet_deger
+                mesaj += f"  - {kod}: {lot} Lot (⏳ Henüz İşleme Başlamadı - Maliyet: {maliyet_deger:.2f} TL)\n"
                 
         mesaj += f"  *Toplam:* {user_toplam:.2f} TL\n\n"
         
@@ -175,7 +179,9 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
                         kalan_deger = current_price * yeni_lot
                         await update.message.reply_text(f"✅ {username.capitalize()} portföyünden {lot} lot {kod} satıldı. Kalan {yeni_lot} lotun güncel değeri yaklaşık: {kalan_deger:.2f} TL")
                     else:
-                        await update.message.reply_text(f"✅ {username.capitalize()} portföyünden {lot} lot {kod} satıldı. Kalan lot: {yeni_lot}")
+                        maliyet = portfolio.data[username].get(kod, {}).get("maliyet", 0)
+                        kalan_deger = maliyet * yeni_lot
+                        await update.message.reply_text(f"✅ {username.capitalize()} portföyünden {lot} lot {kod} satıldı. Kalan {yeni_lot} lotun maliyet değeri: {kalan_deger:.2f} TL")
         except Exception as e:
             await update.message.reply_text(f"❌ Hata: {str(e)}")
             
@@ -192,18 +198,22 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
         for kod, info in portfolio.data[username].items():
             lot = info['lot']
             maliyet = info['maliyet']
+            maliyet_deger = maliyet * lot
             current_price = portfolio.get_current_price(kod)
             
             if current_price:
                 guncel_deger = current_price * lot
-                maliyet_deger = maliyet * lot
                 kar_zarar = guncel_deger - maliyet_deger
                 toplam_portfoy_degeri += guncel_deger
+                yuzde = ((guncel_deger - maliyet_deger) / maliyet_deger * 100) if maliyet_deger > 0 else 0
+                emoji = "🟢" if kar_zarar >= 0 else "🔴"
                 mesaj += f"🔹 **{kod}**: {lot} Lot\n"
                 mesaj += f"   Maliyet: {maliyet:.2f} TL | Güncel Fiyat: {current_price:.2f} TL\n"
-                mesaj += f"   Değer: {guncel_deger:.2f} TL (Kâr/Zarar: {kar_zarar:.2f} TL)\n\n"
+                mesaj += f"   Değer: {guncel_deger:.2f} TL | {emoji} Kâr/Zarar: {kar_zarar:+.2f} TL (%{yuzde:+.1f})\n\n"
             else:
-                mesaj += f"🔹 **{kod}**: {lot} Lot (Fiyat çekilemedi)\n\n"
+                toplam_portfoy_degeri += maliyet_deger
+                mesaj += f"🔹 **{kod}**: {lot} Lot (⏳ Henüz İşleme Başlamadı)\n"
+                mesaj += f"   Alış Maliyeti: {maliyet:.2f} TL | Toplam Değer: {maliyet_deger:.2f} TL (Maliyet Bazlı)\n\n"
                 
         mesaj += f"💰 **Toplam Portföy Değeri:** {toplam_portfoy_degeri:.2f} TL"
         await update.message.reply_text(mesaj, parse_mode="Markdown")
